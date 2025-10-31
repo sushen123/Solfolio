@@ -1,7 +1,8 @@
+
 "use client"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, BookmarkIcon, Users, Layers, Search } from "lucide-react"
+import { Home, BookmarkIcon, Users, Layers, Search, TrendingUp, History, Zap, Bot } from "lucide-react"
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -13,9 +14,19 @@ export function Sidebar() {
       icon: Home,
     },
     {
+      name: "Assets",
+      href: "/dashboard/assets",
+      icon: Layers,
+    },
+    {
       name: "Search",
       href: "/dashboard/search",
       icon: Search,
+    },
+    {
+      name: "AI Chat",
+      href: "/dashboard/ai-chat",
+      icon: Bot,
     },
     {
       name: "Watchlist",
@@ -31,6 +42,17 @@ export function Sidebar() {
       name: "Multifolio",
       href: "/dashboard/multifolio",
       icon: Layers,
+    },
+    {
+      name: "NFT Gallery",
+      href: "/dashboard/nft-gallery",
+      icon: Layers,
+    },
+    
+    {
+      name: "Transactions",
+      href: "/dashboard/transactions",
+      icon: History,
     },
   ]
 

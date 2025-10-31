@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@config "../tailwind.config.js";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -23,6 +24,8 @@
   --border: oklch(0.2 0 0);
   --input: oklch(0.15 0 0);
   --ring: oklch(0.5 0.2 264);
+  --selection: oklch(0.6 0.2 240);
+  --selection-foreground: oklch(0.98 0 0);
   --chart-1: oklch(0.6 0.2 264);
   --chart-2: oklch(0.6 0.2 180);
   --chart-3: oklch(0.6 0.2 120);
@@ -59,6 +62,8 @@
   --border: oklch(0.2 0 0);
   --input: oklch(0.15 0 0);
   --ring: oklch(0.5 0.2 264);
+  --selection: oklch(0.6 0.2 240);
+  --selection-foreground: oklch(0.98 0 0);
   --chart-1: oklch(0.6 0.2 264);
   --chart-2: oklch(0.6 0.2 180);
   --chart-3: oklch(0.6 0.2 120);
@@ -123,4 +128,27 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* In your app/globals.css file */
+
+.ai-chat-bubble p {
+  color: #d4d4d4; /* A light gray color */
+  margin-bottom: 1rem;
+}
+
+.ai-chat-bubble ul {
+  list-style-type: disc;
+  list-style-position: inside;
+  margin-left: 1rem;
+  color: #d4d4d4;
+}
+
+.ai-chat-bubble li {
+  margin-bottom: 0.5rem;
+}
+
+.ai-chat-bubble a {
+  color: #60a5fa; /* A nice blue color */
+  text-decoration: underline;
 }

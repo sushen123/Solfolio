@@ -1,65 +1,78 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import { Trash2, Plus, Copy, Check } from "lucide-react"
+import { useSession } from "next-auth/react"
 
 interface SavedAddress {
   id: string
   label: string
   address: string
   chain: string
-  addedDate: string
+  createdAt: string
 }
 
 export function AddressBookList() {
-  const [addresses, setAddresses] = useState<SavedAddress[]>([
-    {
-      id: "1",
-      label: "Main Wallet",
-      address: "PUSSTX5eXd...L93iv7",
-      chain: "Solana",
-      addedDate: "2024-01-15",
-    },
-    {
-      id: "2",
-      label: "Trading Account",
-      address: "9B85wQnD2k...K2mP9x",
-      chain: "Solana",
-      addedDate: "2024-01-10",
-    },
-    {
-      id: "3",
-      label: "Cold Storage",
-      address: "FvwEAJhqJ8...R7nQ4m",
-      chain: "Solana",
-      addedDate: "2024-01-05",
-    },
-  ])
-
+  const { data: session } = useSession();
+  const [addresses, setAddresses] = useState<SavedAddress[]>([])
   const [newLabel, setNewLabel] = useState("")
   const [newAddress, setNewAddress] = useState("")
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null);
 
-  const handleAddAddress = () => {
+  const fetchAddressBook = async () => {
+    if (!session) return;
+    try {
+      const res = await fetch('/api/addressbook');
+      if (!res.ok) throw new Error('Failed to fetch address book');
+      const data = await res.json();
+      setAddresses(data);
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  useEffect(() => {
+    fetchAddressBook();
+  }, [session]);
+
+  const handleAddAddress = async () => {
     if (newLabel && newAddress) {
-      const newEntry: SavedAddress = {
-        id: Date.now().toString(),
-        label: newLabel,
-        address: newAddress,
-        chain: "Solana",
-        addedDate: new Date().toISOString().split("T")[0],
+      try {
+        console.log("Adding address:", { label: newLabel, address: newAddress });
+        const res = await fetch('/api/addressbook', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ label: newLabel, address: newAddress }),
+        });
+        console.log("Add address response:", res);
+        if (!res.ok) {
+          const errorBody = await res.json();
+          throw new Error(errorBody.error || 'Failed to add address');
+        }
+        fetchAddressBook(); // Refetch
+        setNewLabel("")
+        setNewAddress("")
+      } catch (err: any) {
+        console.error("Error adding address:", err);
+        setError(err.message);
       }
-      setAddresses([...addresses, newEntry])
-      setNewLabel("")
-      setNewAddress("")
     }
   }
 
-  const handleRemove = (id: string) => {
-    setAddresses(addresses.filter((addr) => addr.id !== id))
+  const handleRemove = async (id: string) => {
+    try {
+      const res = await fetch(`/api/addressbook/${id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Failed to remove address');
+      fetchAddressBook(); // Refetch
+    } catch (err: any) {
+      setError(err.message);
+    }
   }
 
   const handleCopy = (address: string, id: string) => {
@@ -70,6 +83,7 @@ export function AddressBookList() {
 
   return (
     <div className="space-y-8">
+      {error && <div className="text-red-500 mb-4">Error: {error}</div>}
       {/* Add New Address Section */}
       <Card className="p-8 bg-gradient-to-br from-background to-background/50 border-border/50">
         <h2 className="text-2xl font-bold text-foreground mb-6">Add New Address</h2>
@@ -132,7 +146,7 @@ export function AddressBookList() {
                 </div>
 
                 <div className="flex items-center justify-between text-xs text-muted-foreground mb-4">
-                  <span>Added {addr.addedDate}</span>
+                  <span>Added {new Date(addr.createdAt).toLocaleDateString()}</span>
                 </div>
 
                 <button

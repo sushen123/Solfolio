@@ -1,42 +1,49 @@
-"use client"
+'use client';
 
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Plus, Search } from "lucide-react"
-
-const AVAILABLE_TOKENS = [
-  { id: 6, name: "Jupiter", symbol: "JUP", price: 0.95 },
-  { id: 7, name: "Orca", symbol: "ORCA", price: 1.23 },
-  { id: 8, name: "Serum", symbol: "SRM", price: 0.45 },
-  { id: 9, name: "Cope", symbol: "COPE", price: 0.12 },
-  { id: 10, name: "Tulip", symbol: "TULIP", price: 0.08 },
-  { id: 11, name: "Cope Token", symbol: "COPE", price: 0.15 },
-  { id: 12, name: "Atrix", symbol: "ATRIX", price: 0.22 },
-]
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Plus, Search } from "lucide-react";
+import { useDebounce } from "@/lib/use-debounce";
+import Image from "next/image";
 
 interface AddToWatchlistProps {
-  onAdd: (token: any) => void
+  onAdd: (tokenId: string) => void;
 }
 
 export function AddToWatchlist({ onAdd }: AddToWatchlistProps) {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [filteredTokens, setFilteredTokens] = useState(AVAILABLE_TOKENS)
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
-  const handleSearch = (query: string) => {
-    setSearchQuery(query)
-    if (query.trim() === "") {
-      setFilteredTokens(AVAILABLE_TOKENS)
-    } else {
-      const filtered = AVAILABLE_TOKENS.filter(
-        (token) =>
-          token.name.toLowerCase().includes(query.toLowerCase()) ||
-          token.symbol.toLowerCase().includes(query.toLowerCase()),
-      )
-      setFilteredTokens(filtered)
+  useEffect(() => {
+    if (debouncedSearchQuery.trim() === "") {
+      setSearchResults([]);
+      return;
     }
-  }
+
+    setLoading(true);
+    const options = {
+      method: 'GET',
+      headers: {
+        accept: 'application/json',
+        authorization: 'Basic emtfZGV2XzY2NzE3YjMzOTMwNTRhZDdhZmY2YzViNWE4NTA5YTZiOg=='
+      }
+    };
+
+    fetch(`https://api.zerion.io/v1/fungibles/?filter[search_query]=${debouncedSearchQuery}`, options)
+      .then(res => res.json())
+      .then(data => {
+        setSearchResults(data.data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setLoading(false);
+      });
+  }, [debouncedSearchQuery]);
 
   return (
     <Card className="bg-card border-border mb-8">
@@ -54,30 +61,36 @@ export function AddToWatchlist({ onAdd }: AddToWatchlistProps) {
             <Input
               placeholder="Search tokens by name or symbol..."
               value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 bg-background border-border"
             />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-64 overflow-y-auto">
-            {filteredTokens.length > 0 ? (
-              filteredTokens.map((token) => (
+            {loading ? (
+              <div className="col-span-full text-center py-8">
+                <p className="text-muted-foreground">Searching...</p>
+              </div>
+            ) : searchResults.length > 0 ? (
+              searchResults.map((token) => (
                 <div
                   key={token.id}
                   className="flex items-center justify-between p-3 bg-background border border-border rounded-lg hover:border-primary/50 transition-colors"
                 >
-                  <div>
-                    <p className="font-medium text-foreground">{token.symbol}</p>
-                    <p className="text-xs text-muted-foreground">{token.name}</p>
-                    <p className="text-sm text-primary font-semibold">${token.price.toFixed(2)}</p>
+                  <div className="flex items-center gap-2">
+                    <Image src={token.attributes.icon?.url || '/placeholder.svg'} alt={token.attributes.name} width={32} height={32} className="rounded-full" />
+                    <div>
+                      <p className="font-medium text-foreground">{token.attributes.symbol}</p>
+                      <p className="text-xs text-muted-foreground">{token.attributes.name}</p>
+                    </div>
                   </div>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => {
-                      onAdd(token)
-                      setSearchQuery("")
-                      setFilteredTokens(AVAILABLE_TOKENS)
+                      onAdd(token.id);
+                      setSearchQuery("");
+                      setSearchResults([]);
                     }}
                     className="border-primary text-primary hover:bg-primary/10"
                   >
@@ -86,13 +99,15 @@ export function AddToWatchlist({ onAdd }: AddToWatchlistProps) {
                 </div>
               ))
             ) : (
-              <div className="col-span-full text-center py-8">
-                <p className="text-muted-foreground">No tokens found</p>
-              </div>
+              searchQuery.trim() !== "" && (
+                <div className="col-span-full text-center py-8">
+                  <p className="text-muted-foreground">No tokens found</p>
+                </div>
+              )
             )}
           </div>
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

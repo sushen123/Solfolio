@@ -1,76 +1,112 @@
-"use client"
+'use client';
 
-import { useState } from "react"
-import { WatchlistTable } from "@/components/watchlist-table"
-import { AddToWatchlist } from "@/components/add-to-watchlist"
-
-const INITIAL_WATCHLIST = [
-  {
-    id: 1,
-    name: "Solana",
-    symbol: "SOL",
-    price: 142.5,
-    change24h: 5.23,
-    marketCap: 65000000000,
-    volume24h: 2500000000,
-  },
-  {
-    id: 2,
-    name: "Raydium",
-    symbol: "RAY",
-    price: 5.45,
-    change24h: -2.15,
-    marketCap: 1200000000,
-    volume24h: 85000000,
-  },
-  {
-    id: 3,
-    name: "Magic Eden",
-    symbol: "ME",
-    price: 3.2,
-    change24h: 8.45,
-    marketCap: 850000000,
-    volume24h: 45000000,
-  },
-  {
-    id: 4,
-    name: "Phantom",
-    symbol: "PHANTOM",
-    price: 0.85,
-    change24h: -1.23,
-    marketCap: 500000000,
-    volume24h: 25000000,
-  },
-  {
-    id: 5,
-    name: "Marinade",
-    symbol: "MNDE",
-    price: 2.34,
-    change24h: 3.67,
-    marketCap: 450000000,
-    volume24h: 15000000,
-  },
-]
+import { useState, useEffect } from "react";
+import { WatchlistTable } from "@/components/watchlist-table";
+import { AddToWatchlist } from "@/components/add-to-watchlist";
+import { useSession } from "next-auth/react";
 
 export default function WatchlistPage() {
-  const [watchlist, setWatchlist] = useState(INITIAL_WATCHLIST)
+  const { data: session } = useSession();
+  const [watchlistIds, setWatchlistIds] = useState<string[]>([]);
+  const [tokenData, setTokenData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleAddToken = (token: any) => {
-    const newToken = {
-      id: Math.max(...watchlist.map((t) => t.id), 0) + 1,
-      name: token.name,
-      symbol: token.symbol,
-      price: token.price,
-      change24h: Math.random() * 20 - 10,
-      marketCap: Math.random() * 5000000000,
-      volume24h: Math.random() * 500000000,
+  const fetchWatchlist = async () => {
+    if (!session) return;
+    setLoading(true);
+    try {
+      const res = await fetch('/api/watchlist');
+      if (!res.ok) throw new Error('Failed to fetch watchlist');
+      const data = await res.json();
+      setWatchlistIds(data.map((item: any) => item.tokenId));
+    } catch (err: any) {
+      setError(err.message);
     }
-    setWatchlist([...watchlist, newToken])
-  }
+  };
 
-  const handleRemoveToken = (id: number) => {
-    setWatchlist(watchlist.filter((token) => token.id !== id))
-  }
+  useEffect(() => {
+    fetchWatchlist();
+  }, [session]);
+
+  useEffect(() => {
+    if (watchlistIds.length === 0) {
+      setTokenData([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    const options = {
+      method: 'GET',
+      headers: {
+        accept: 'application/json',
+        authorization: 'Basic emtfZGV2XzY2NzE3YjMzOTMwNTRhZDdhZmY2YzViNWE4NTA5YTZiOg=='
+      }
+    };
+
+    const ids = watchlistIds.join(',');
+    fetch(`https://api.zerion.io/v1/fungibles/?filter[fungible_ids]=${ids}`, options)
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch token data');
+        return res.json();
+      })
+      .then(fungiblesData => {
+        const tokens = fungiblesData.data;
+        const chartPromises = tokens.map((token: any) => 
+          fetch(`https://api.zerion.io/v1/fungibles/${token.id}/charts/day`, options)
+            .then(res => {
+                if (!res.ok) throw new Error(`Failed to fetch chart for ${token.id}`);
+                return res.json();
+            })
+        );
+
+        return Promise.all(chartPromises).then(chartsData => {
+            const combinedData = tokens.map((token: any, index: number) => {
+              const chartStats = chartsData[index]?.data?.attributes?.stats;
+              return {
+                ...token,
+                day_high: chartStats?.max || 0,
+                day_low: chartStats?.min || 0,
+              };
+            });
+            setTokenData(combinedData);
+        });
+      })
+      .catch(err => {
+        setError(err.message);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [watchlistIds]);
+
+  const handleAddToken = async (tokenId: string) => {
+    try {
+      const res = await fetch('/api/watchlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tokenId }),
+      });
+      if (!res.ok) throw new Error('Failed to add token to watchlist');
+      fetchWatchlist(); // Refetch watchlist
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const handleRemoveToken = async (tokenId: string) => {
+    try {
+      const res = await fetch(`/api/watchlist/${tokenId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Failed to remove token from watchlist');
+      fetchWatchlist(); // Refetch watchlist
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -80,7 +116,8 @@ export default function WatchlistPage() {
       </div>
 
       <AddToWatchlist onAdd={handleAddToken} />
-      <WatchlistTable watchlist={watchlist} onRemove={handleRemoveToken} />
+      {error && <div className="text-red-500 mb-4">Error: {error}</div>}
+      <WatchlistTable watchlist={tokenData} onRemove={handleRemoveToken} loading={loading} />
     </div>
-  )
+  );
 }

@@ -1,14 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, TrendingUp, BarChart3, Zap, Wallet } from "lucide-react"
+import { ArrowRight, TrendingUp, BarChart3, Zap } from "lucide-react"
 import { WalletConnectButton } from "@/components/wallet-connect-button"
 
 export default function LandingPage() {
   const [isConnected, setIsConnected] = useState(false)
   const [connectedAddress, setConnectedAddress] = useState("")
+  const router = useRouter()
 
   const handleConnect = (address: string) => {
     if (address) {
@@ -19,6 +21,12 @@ export default function LandingPage() {
       setIsConnected(false)
     }
   }
+
+  useEffect(() => {
+    if (isConnected) {
+      router.push("/dashboard")
+    }
+  }, [isConnected, router])
 
   return (
     <main className="min-h-screen bg-background">
@@ -57,24 +65,11 @@ export default function LandingPage() {
                 </Button>
               </Link>
             ) : (
-              <>
-                <Button
-                  size="lg"
-                  className="gap-2"
-                  onClick={() => {
-                    const mockWalletAddress = "9B5X4bsuM373NUZAUBbGkCBDm2KwBL5zTg6G5V8UqJ7k"
-                    handleConnect(mockWalletAddress)
-                  }}
-                >
-                  <Wallet className="w-4 h-4" />
-                  Connect Wallet
+              <Link href="/dashboard">
+                <Button size="lg" variant="outline">
+                  Explore Demo
                 </Button>
-                <Link href="/dashboard">
-                  <Button size="lg" variant="outline">
-                    Explore Demo
-                  </Button>
-                </Link>
-              </>
+              </Link>
             )}
           </div>
         </div>
@@ -154,3 +149,4 @@ export default function LandingPage() {
     </main>
   )
 }
+

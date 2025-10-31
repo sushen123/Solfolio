@@ -1,111 +1,184 @@
+
 "use client"
 
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts"
+import { ChainDistributionCard } from "./ChainDistributionCard"
 
-interface PortfolioOverviewProps {
-  walletAddress: string
-}
-
-const DUMMY_PORTFOLIO_DATA = {
-  totalValue: 125430.5,
-  change24h: 3250.75,
-  changePercent24h: 2.65,
-  topAssets: [
-    { name: "SOL", value: 45000, percentage: 35.8 },
-    { name: "USDC", value: 32000, percentage: 25.5 },
-    { name: "ORCA", value: 22500, percentage: 17.9 },
-    { name: "COPE", value: 15000, percentage: 11.9 },
-    { name: "Others", value: 10930.5, percentage: 8.7 },
-  ],
-}
-
-const COLORS = [
-  "#a78bfa", // Purple (chart-1)
-  "#22d3ee", // Cyan (chart-2)
-  "#10b981", // Green (chart-3)
-  "#f59e0b", // Orange (chart-4)
-  "#ec4899", // Pink (chart-5)
-]
-
-export function PortfolioOverview({ walletAddress }: PortfolioOverviewProps) {
-  const isPositive = DUMMY_PORTFOLIO_DATA.change24h >= 0
+const PnlValue = ({ value, percentage, hideSign = false }: { value: number; percentage?: number, hideSign?: boolean }) => {
+  const isPositive = value >= 0;
+  const color = isPositive ? "text-green-500" : "text-red-500";
+  const sign = isPositive ? "+" : "";
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {/* Total Value Card */}
-      <Card className="bg-card border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-muted-foreground">Total Portfolio Value</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <p className="text-3xl font-bold text-foreground">
-              ${DUMMY_PORTFOLIO_DATA.totalValue.toLocaleString("en-US", { maximumFractionDigits: 2 })}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Wallet: {walletAddress.slice(0, 8)}...{walletAddress.slice(-8)}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="font-bold">
+      <span className={color}>
+        {hideSign ? "" : sign}${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      </span>
+      {percentage !== undefined && (
+        <span className={`text-sm ml-2 ${color}`}>
+          ({sign}{percentage.toFixed(1)}%)
+        </span>
+      )}
+    </div>
+  );
+};
 
-      {/* 24h Change Card */}
-      <Card className="bg-card border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-muted-foreground">24h Change</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <p className={`text-3xl font-bold ${isPositive ? "text-green-500" : "text-red-500"}`}>
-              {isPositive ? "+" : ""}
-              {DUMMY_PORTFOLIO_DATA.change24h.toLocaleString("en-US", { maximumFractionDigits: 2 })} USD
-            </p>
-            <p className={`text-sm font-medium ${isPositive ? "text-green-500" : "text-red-500"}`}>
-              {isPositive ? "+" : ""}
-              {DUMMY_PORTFOLIO_DATA.changePercent24h.toFixed(2)}%
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+interface PortfolioOverviewProps {
+  walletAddress: string;
+  pnlSummary: any;
+}
 
-      {/* Top Assets Pie Chart */}
-      <Card className="bg-card border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-muted-foreground">Top 5 Assets</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie
-                data={DUMMY_PORTFOLIO_DATA.topAssets}
-                cx="50%"
-                cy="50%"
-                innerRadius={50}
-                outerRadius={80}
-                paddingAngle={2}
-                dataKey="value"
-              >
-                {DUMMY_PORTFOLIO_DATA.topAssets.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip formatter={(value) => `$${value.toLocaleString()}`} />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="mt-4 space-y-2">
-            {DUMMY_PORTFOLIO_DATA.topAssets.map((asset, index) => (
-              <div key={asset.name} className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                  <span className="text-foreground font-medium">{asset.name}</span>
-                </div>
-                <span className="text-muted-foreground">{asset.percentage}%</span>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+export function PortfolioOverview({ walletAddress, pnlSummary }: PortfolioOverviewProps) {
+  const [portfolioData, setPortfolioData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [notFound, setNotFound] = useState(false)
+
+  useEffect(() => {
+    if (walletAddress) {
+      setLoading(true)
+      setNotFound(false)
+      setError(null)
+      fetch(`/api/portfolio/${walletAddress}`)
+        .then((res) => {
+          if (res.status === 404) {
+            setNotFound(true)
+            throw new Error('Wallet not found');
+          }
+          if (!res.ok) {
+            throw new Error('Failed to fetch portfolio data');
+          }
+          return res.json()
+        })
+        .then((data) => {
+          setPortfolioData(data.data)
+          setLoading(false)
+        })
+        .catch((err) => {
+          if (!notFound) {
+            setError(err.message)
+          }
+          setLoading(false)
+        })
+    }
+  }, [walletAddress, notFound])
+
+  if (loading) {
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="bg-card border-border"><CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">Total Portfolio Value</CardTitle></CardHeader><CardContent><div className="h-16 w-1/2 bg-muted/50 animate-pulse rounded-md"></div></CardContent></Card>
+            <Card className="bg-card border-border"><CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">24h Change</CardTitle></CardHeader><CardContent><div className="h-16 w-1/2 bg-muted/50 animate-pulse rounded-md"></div></CardContent></Card>
+            <Card className="bg-card border-border"><CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">Chain Distribution</CardTitle></CardHeader><CardContent><div className="h-48 w-full bg-muted/50 animate-pulse rounded-full"></div></CardContent></Card>
+        </div>
+    )
+  }
+
+  if (notFound) {
+    return <div className="text-center py-12 text-lg text-muted-foreground">Wallet not found. Please check the address and try again.</div>
+  }
+
+  if (error) {
+    return <div className="text-red-500">Error: {error}</div>
+  }
+
+  if (!portfolioData) {
+    return null
+  }
+
+  const { attributes } = portfolioData;
+  const totalValue = attributes.total.positions || 0;
+  const change24h = attributes.changes.absolute_1d || 0;
+  const changePercent24h = attributes.changes.percent_1d || 0;
+  const isPositive = change24h >= 0
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Total Value Card */}
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Portfolio Value</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <p className="text-3xl font-bold text-foreground">
+                ${totalValue.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Wallet: {walletAddress.slice(0, 8)}...{walletAddress.slice(-8)}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 24h Change Card */}
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">24h Change</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <p className={`text-3xl font-bold ${isPositive ? "text-green-500" : "text-red-500"}`}>
+                {isPositive ? "+" : ""}
+                {change24h.toLocaleString("en-US", { maximumFractionDigits: 2 })} USD
+              </p>
+              <p className={`text-sm font-medium ${isPositive ? "text-green-500" : "text-red-500"}`}>
+                {isPositive ? "+" : ""}
+                {changePercent24h.toFixed(2)}%
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Net Invested</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${pnlSummary && pnlSummary.net_invested.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Realized PnL</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {pnlSummary && <PnlValue value={pnlSummary.realized_gain} />}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Unrealized PnL</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {pnlSummary && <PnlValue value={pnlSummary.unrealized_gain} />}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Received</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">${pnlSummary && pnlSummary.received_external.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Sent</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">${pnlSummary && pnlSummary.sent_external.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </CardContent>
+          </Card>
+        </div>
+        <ChainDistributionCard distribution={attributes.positions_distribution_by_chain} />
+      </div>
     </div>
   )
 }
+
